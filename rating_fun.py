@@ -29,11 +29,11 @@ def get_tourn(tourn_id, is_api, is_write):
     
     # если нас попросили достать с сайта, используем API
     if is_api==True:
-        d=pd.read_json(t_url)
+        d=pd.read_json(t_url, dtype={'mask':'str'})
     
     # иначе: читаем из файла
     else:
-        d=pd.read_json(path)
+        d=pd.read_json(path, dtype={'mask':'str'})
     
     # если нас попросили, пишем в файл
     if is_write==True:
@@ -117,6 +117,21 @@ def prep_tourn(tourn_id, is_api, is_write):
     
     return df
     
+# Уровень 3: высокая наука
+
+# расчёт слоэности каждого вопроса
+# на вход подаём numpy-массив (строки - команды, столбцы - вопросы)
+# на выходе массив сложностей
+def difficult(table):
     
+    # главное - не перепутать строки и столбцы
+    qv=table.shape[1]
+    teams=table.shape[0]
+    
+    # сложность - доля команд, которые не взяли вопрос
+    # у "гроба" сложность 1, у "гайки" - 0
+    d=(teams-np.sum(table, axis=0))/teams
+    
+    return d
 
 
