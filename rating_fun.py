@@ -137,7 +137,7 @@ def difficult(table):
     return d
 
 # вся нужная информация в одном месте
-# rjvfyl
+# 
 def qv_stat(tourn_id, is_api, is_write):
     
     df=prep_tourn(tourn_id, is_api, is_write)
@@ -147,10 +147,12 @@ def qv_stat(tourn_id, is_api, is_write):
     qvt=qv.values.shape[1]
     teams=qv.values.shape[0]
     
+    
     d=difficult(qv.values)
     
     qv_t=qv.T
     qv_t['qv_num']=qv_t.index
+    qv_t['chr_rank']=range(1, len(qv_t)+1)
     qv_t['teams']=teams
     qv_t['questions']=qvt
     qv_t['difficult']=d
@@ -176,10 +178,10 @@ def qv_stat(tourn_id, is_api, is_write):
     g=qv_t.groupby('class').agg({ 'difficult': np.mean})
     g['class_order']=rankdata(g['difficult'], method='ordinal')
     ddict={
-        1:"1. Очень простой",
-        2:"2. Простой",
-        3:"3. Сложный",
-        4:"4. Очень сложный"
+        1:"1. Очень простые",
+        2:"2. Простые",
+        3:"3. Сложные",
+        4:"4. Очень сложные"
 
     }
     g['class_dif']=g['class_order'].map(ddict)
@@ -190,13 +192,15 @@ def qv_stat(tourn_id, is_api, is_write):
     
     return t
 
-def d_graph(df):
+def d_graph(tourn_id, is_api, is_write):
     import plotly
     from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
     import plotly.graph_objs as go
     init_notebook_mode(connected=True)
     
-    df=df[['dif_rank', 'difficult', 'class']]
+    df=qv_stat(tourn_id, is_api, is_write)
+    
+    df=df[['dif_rank', 'difficult_qv', 'class']]
     df['c1']=np.where(df['class']==1.00,df['class']+1,0)
     df['c2']=np.where(df['class']==0.00,df['class']+1,0)
     df['c3']=np.where(df['class']==0.33,df['class']+1,0)
@@ -204,11 +208,11 @@ def d_graph(df):
 
     trace1 = go.Scatter(
         x=df['dif_rank'],
-        y=df['difficult'],
+        y=df['difficult_qv'],
         #fill='tozeroy',
         name='dif',
         marker=dict(
-            color='rgb(250, 250, 250)'
+            color='rgb(0, 0, 250)'
         )
     )
     trace2 = go.Scatter(
@@ -275,7 +279,93 @@ def d_graph(df):
     fig = go.Figure(data=data, layout=layout)
     iplot(fig, show_link=False)
     
-    return df
+
+def qv_graph(tourn_id, is_api, is_write):
+    import plotly
+    from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
+    import plotly.graph_objs as go
+    init_notebook_mode(connected=True)
+    
+    df=qv_stat(tourn_id, is_api, is_write)
+    
+    df=df[['chr_rank', 'difficult_qv']].sort_values(by='chr_rank')
+
+    trace1 = go.Scatter(
+        x=df['chr_rank'],
+        y=df['difficult_qv'],
+        #fill='tozeroy',
+        name='dif',
+        marker=dict(
+            color='rgb(0, 0, 250)'
+        )
+    )
+
+
+    data = [trace1]
+    layout = go.Layout(
+        title='Dif class',
+        yaxis=dict(
+            title='',
+            rangemode='tozero'
+        ),
+        yaxis2=dict(
+            title='',
+            titlefont=dict(
+                color='rgb(148, 103, 189)'
+            ),
+            tickfont=dict(
+                color='rgb(148, 103, 189)'
+            ),
+            overlaying='y',
+            side='right',
+            rangemode='tozero'
+        )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig, show_link=False)
+    
+def hist(df):
+    import plotly
+    from plotly.offline import download_plotlyjs, init_notebook_mode, plot, iplot
+    import plotly.graph_objs as go
+    init_notebook_mode(connected=True)
+    
+
+    trace1 = go.Bar(
+        x=df['stack'],
+        y=df['team_id'],
+        #fill='tozeroy',
+        name='dif',
+        marker=dict(
+            color='rgb(0, 0, 250)'
+        )
+    )
+
+
+    data = [trace1]
+    layout = go.Layout(
+        title='Dif class',
+        yaxis=dict(
+            title='',
+            rangemode='tozero'
+        ),
+        yaxis2=dict(
+            title='',
+            titlefont=dict(
+                color='rgb(148, 103, 189)'
+            ),
+            tickfont=dict(
+                color='rgb(148, 103, 189)'
+            ),
+            overlaying='y',
+            side='right',
+            rangemode='tozero'
+        )
+    )
+    fig = go.Figure(data=data, layout=layout)
+    iplot(fig, show_link=False)
+    
+
 
 # функция для сбора всей важной информации о туирнире в нормализованном виде
 # дальше только слайсить и группировать
@@ -327,8 +417,8 @@ def full_stat(tourn_id, is_api, is_write):
 
 # определяем стиль команды по статистике вопросов
 def style(g):
-    smpl=g[g['class_dif']=='1. Очень простой']['mark'].values[0]+g[g['class_dif']=='2. Простой']['mark'].values[0]
-    hrd=g[g['class_dif']=='3. Сложный']['mark'].values[0]+g[g['class_dif']=='4. Очень сложный']['mark'].values[0]
+    smpl=g[g['class_dif']=='1. Очень простые']['mark'].values[0]+g[g['class_dif']=='2. Простые']['mark'].values[0]
+    hrd=g[g['class_dif']=='3. Сложные']['mark'].values[0]+g[g['class_dif']=='4. Очень сложные']['mark'].values[0]
     tot=np.sum(g['mark'])
 
     if tot<6:
@@ -400,4 +490,60 @@ def total_culc(tourn_id, is_api, is_write):
     
     return t
 
+# уровень 4: показываем живым людям
+def show_team_in_tourn(tourn_id, team_id, is_api, is_write):
+    stat=full_stat(tourn_id, is_api, is_write)
+    mark=total_culc(tourn_id, is_api, is_write)
+    
+    t=stat[stat['team_id']==team_id]
+    m=mark[mark['team_id']==team_id]
+    
+    print('Команда', t['current_name'].values[0], '(id=',  t['team_id'].values[0], ') ')
+    print('на турнире ', t['name'].values[0], '(id=', t['tourn_id'].values[0],')')
+    print('Тип турнира: ', t['type_name'].values[0])
+    print('Участвовало команд:', t['teams'].values[0])
+    print('Результат команды: ', t['questions_suc'].values[0], '/', t['questions_total'].values[0])
+    print('Изменения рейтинга команды после турнира:', t['diff_bonus'].values[0])
+    
+    print('Стиль команды на турнире:', m['style'].values[0])
+    m=m[['class_dif', 'score', 'total', 'mark']]
+    
+    print('Статистика по типам вопросов:')
+    print(m.values[0][0], ':', m.values[0][1], '/', m.values[0][2], 'оценка: ', m.values[0][3])
+    print(m.values[1][0], ':', m.values[1][1], '/', m.values[1][2], 'оценка: ', m.values[1][3])
+    print(m.values[2][0], ':', m.values[2][1], '/', m.values[2][2], 'оценка: ', m.values[2][3])
+    print(m.values[3][0], ':', m.values[3][1], '/', m.values[3][2], 'оценка: ', m.values[3][3])
+    
+    taken=t[t['result']==1].sort_values(by='difficult', ascending=False)
+    failed=t[t['result']==0].sort_values(by='difficult', ascending=True)
+    
+    print('Номера самых простых невзятых вопросв:', failed['qv_num'].values[0:3])
+    print('Номера самых сложных взятых вопросов:', taken['qv_num'].values[0:3]) 
+    
+    return mark[mark['team_id']==team_id]
+
+
+def show_tourn(tourn_id, is_api, is_write):
+    stat=full_stat(tourn_id, is_api, is_write)
+    print('Турнир ', stat['name'].values[0], '(id=', stat['tourn_id'].values[0], stat['date_start'].values[0], ')')
+    qv_graph(tourn_id, is_api, is_write)
+    d_graph(tourn_id, is_api, is_write)
+    
+    dd=stat.groupby('team_id').mean()[['diff_bonus']].reset_index().sort_values(by='diff_bonus')
+    dd['stack']=np.round(dd['diff_bonus']/100,0)*100
+    
+    h=dd.groupby('stack').agg('count').sort_values(by='stack').reset_index()
+    
+    hist(h)
+    
+    print('Средний бонус:', np.round(np.mean(dd['diff_bonus']),2))
+    print('Медианный бонус',np.median(dd['diff_bonus']))
+    from scipy import stats
+    print('Мода бонуса', stats.mode(dd['diff_bonus'])[0][0])
+    
+    print('Корреляция факта с прогнозом по местам', 
+          np.round(stats.pearsonr(stat['position'], stat['predicted_position'])[0],2)
+         )
+    
+    
 
