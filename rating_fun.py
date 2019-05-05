@@ -75,6 +75,7 @@ def qv_from_mask(mask):
         qv=np.append(qv,int(ch))   
     return qv
 
+# объективнеы данные о турнире в удобном формате для дальнейшей работы
 def prep_tourn(tourn_id, is_api, is_write):
     # получаем данные "как есть"
     df=get_tourn(tourn_id, is_api, is_write)
@@ -109,6 +110,7 @@ def prep_tourn(tourn_id, is_api, is_write):
     del df['mask']
     
     # приведём всё к целому типу
+    # сьтобцы с 14 по 17 содержат текстовую информацию
     r1=df.columns[4:14]
     r2=df.columns[17:]
     r=np.append(r1, r2)
@@ -134,7 +136,8 @@ def difficult(table):
     
     return d
 
-
+# вся нужная информация в одном месте
+# rjvfyl
 def qv_stat(tourn_id, is_api, is_write):
     
     df=prep_tourn(tourn_id, is_api, is_write)
@@ -311,7 +314,7 @@ def full_stat(tourn_id, is_api, is_write):
     if teams<30:
         char=3
     else:
-        char=int(np.round(teams*0.1,0))
+        char=int(np.round(char,0))
 
 
     top=df.groupby('team_id').sum()[['questions_suc']].sort_values(by='questions_suc', ascending=False).reset_index()
@@ -320,5 +323,81 @@ def full_stat(tourn_id, is_api, is_write):
     
     res=res.merge(top[['team_id', 'is_top']], 'left', on='team_id')
     
-    
     return res
+
+# определяем стиль команды по статистике вопросов
+def style(g):
+    smpl=g[g['class_dif']=='1. Очень простой']['mark'].values[0]+g[g['class_dif']=='2. Простой']['mark'].values[0]
+    hrd=g[g['class_dif']=='3. Сложный']['mark'].values[0]+g[g['class_dif']=='4. Очень сложный']['mark'].values[0]
+    tot=np.sum(g['mark'])
+
+    if tot<6:
+        res='Слабая'
+    elif smpl > hrd:
+        res='Техничная'
+    elif smpl < hrd:
+        res='Креативная'
+    elif smpl < hrd:
+        res='Стабильная'
+    else:
+        res='Нестабильная'
+    return res
+
+# считаем статистику по конкретной команде
+def team_stat(df, team_id, tourn_stat, top_stat):
+    w=df[df['team_id']==team_id][['class_dif', 'result']]
+    team_stat=w.groupby(['class_dif']).agg(['sum', 'count']).reset_index()
+    team_stat['share']=team_stat['result']['sum']/team_stat['result']['count']
+    
+    team_stat['score']=team_stat['result']['sum']
+    team_stat['total']=team_stat['result']['count']
+    
+    del team_stat['result']
+    
+    team_stat=team_stat.merge(tourn_stat[['share', 'class_dif']], 'left', on='class_dif', suffixes=('', '_tourn'))
+    team_stat=team_stat.merge(top_stat[['share', 'class_dif']], 'left', on='class_dif', suffixes=('', '_top'))
+    team_stat['team_id']=team_id
+    
+    # оценка за игру на каждом классе вопросов
+    team_stat['mark']=np.where(team_stat['share']>=team_stat['share_top'], 3, 
+                            np.where(
+                                       (
+                                           team_stat['share']>=team_stat['share_tourn']
+                                       )
+                                         &
+                                       (
+                                           team_stat['share']<team_stat['share_top']
+                                       )
+                                       , 2, 
+                                  1)
+                              )
+    team_stat['style']=style(team_stat)
+    
+    return team_stat
+
+# рсчёт значений по всему турниру
+def total_culc(tourn_id, is_api, is_write):
+    
+    df=full_stat(tourn_id, is_api, is_write)
+    # считаем статистику по турниру в целом
+    w=df[['class_dif', 'result']]
+    tourn_stat=w.groupby(['class_dif']).agg(['sum', 'count']).reset_index()
+    tourn_stat['share']=tourn_stat['result']['sum']/tourn_stat['result']['count']
+    
+    # считаем статистику по лучшим командам
+    w=df[df['is_top']==1][['class_dif', 'result']]
+    top_stat=w.groupby(['class_dif']).agg(['sum', 'count']).reset_index()
+    top_stat['share']=top_stat['result']['sum']/top_stat['result']['count']
+    
+    
+    teams_list=df['team_id'].drop_duplicates().values
+    #teams_list=[6874]
+    t=pd.DataFrame()
+    tb=pd.DataFrame()
+    for team_id in teams_list:
+        tb=team_stat(df, team_id, tourn_stat, top_stat)
+        t=pd.concat([t, tb])
+    
+    return t
+
+
